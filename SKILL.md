@@ -3,80 +3,48 @@ name: google-finance
 description: "Track stock prices and company news from Google Finance on a schedule. Use when user wants to monitor stocks, get buy/sell recommendations, check price changes, follow company news, set up stock alerts, or track portfolio symbols. Triggers: 'track stock', 'watch AAPL', 'stock alert', 'buy or sell', 'stock news', 'Google Finance'. Default watchlist: NVDA, AAPL, META, GOOGL."
 homepage: https://finance.google.com
 user-invocable: true
-metadata: {"clawdbot": {"emoji": "📈", "requires": {"bins": ["python3", "curl"]}, "os": ["darwin", "linux", "win32"], "files": ["scripts/parse-stock.py"]}}
+metadata: {"clawdbot": {"emoji": "📈", "requires": {"bins": ["python3"]}, "os": ["darwin", "linux", "win32"], "files": ["scripts/parse-stock.py"]}}
 ---
 
 # Stock Tracker
 
-Monitor stocks on Google Finance, surface company news, and generate buy/sell signals on a schedule.
+Monitor stocks, generate buy/sell signals, and track your portfolio.
 
 ## Quick Start
 
-**Add a stock to the watchlist:**
-```
-/stock-tracker add AAPL
-/stock-tracker add TSLA NVDA MSFT        ← multiple at once
-/stock-tracker add 0700.HK               ← HK-listed stocks
+**Check all watched stocks (auto-fetches data):**
+```bash
+python3 {baseDir}/scripts/parse-stock.py --check --summary
 ```
 
-**Run an immediate check on all watched stocks:**
-```
-/stock-tracker check
+**Check single stock:**
+```bash
+python3 {baseDir}/scripts/parse-stock.py --check --symbol AAPL
 ```
 
-**Check a single symbol:**
-```
-/stock-tracker check AAPL
+**Add/remove stocks:**
+```bash
+python3 {baseDir}/scripts/parse-stock.py --add TSLA
+python3 {baseDir}/scripts/parse-stock.py --remove TSLA
 ```
 
 **Show watchlist:**
-```
-/stock-tracker list
-```
-
-**Remove a stock:**
-```
-/stock-tracker remove TSLA
-```
-
-**Set up a recurring cron schedule:**
-```
-/stock-tracker schedule                  ← interactive setup
+```bash
+python3 {baseDir}/scripts/parse-stock.py --list
 ```
 
 ---
 
-## Step-by-Step Workflow
+## How It Works
 
-### 1. Fetch Price Data (Google Finance)
+The `parse-stock.py` script handles everything:
 
-Navigate browser to `https://www.google.com/finance/quote/{SYMBOL}:{EXCHANGE}`.
+1. **Fetches data** from Google Finance (no API key required!)
+2. **Calculates scores** based on momentum, volume, valuation
+3. **Generates signals** (BUY / HOLD / SELL)
+4. **Updates state** in `~/.openclaw/workspace/stock-tracker-state.json`
 
-Extract the following fields from the page DOM:
-
-| Field | CSS selector hint |
-|-------|------------------|
-| Current price | `[data-last-price]` or `.YMlKec.fxKbKc` |
-| Price change (%) | `.JwB6zf` |
-| Open / High / Low | `.P6K39c` table rows |
-| Market cap | table row labeled "Market cap" |
-| P/E ratio | table row labeled "P/E ratio" |
-| 52-week range | table row labeled "52-week range" |
-| Volume vs avg | table row labeled "Avg volume" |
-
-If the DOM selector fails, fall back to scraping the visible text between price markers. See `{baseDir}/references/data-sources.md` for exchange suffix mapping and fallback sources.
-
-### 2. Fetch Company News
-
-On the same Google Finance page, scroll to the "News" section and extract the top 5–8 headlines with:
-- Title
-- Source
-- Published time (relative, e.g. "3 hours ago")
-- URL
-
-Also search: `https://www.google.com/search?q={COMPANY_NAME}+stock+news&tbm=nws&tbs=qdr:d` for the past 24 hours of news.
-
-### 3. Run Analysis
+### Analysis Framework
 
 Apply the scoring framework in `{baseDir}/references/analysis-framework.md` to produce:
 
@@ -200,9 +168,6 @@ This skill makes outbound requests to the following public URLs only:
 | URL | Purpose |
 |-----|---------|
 | `https://www.google.com/finance/quote/*` | Stock price & stats |
-| `https://www.google.com/search?tbm=nws` | Company news search |
-| `https://query1.finance.yahoo.com/v8/finance/chart/*` | Fallback price data |
-| `https://stooq.com/q/l/*` | Fallback international data |
 
 No user data, credentials, or personal information is sent to any external endpoint.
 
@@ -210,8 +175,8 @@ No user data, credentials, or personal information is sent to any external endpo
 
 ## Security & Privacy
 
-- **No credentials required.** All data is fetched from public, unauthenticated endpoints.
+- **No credentials required.** All data is fetched from public Google Finance pages.
 - **Local state only.** The watchlist and price snapshots are stored exclusively at `~/.openclaw/workspace/stock-tracker-state.json` on your machine. Nothing is sent to remote servers.
-- **No code execution from web content.** The browser is used read-only to scrape DOM text. No scripts from Google Finance are executed by this skill.
-- **`parse-stock.py` is sandboxed.** It reads/writes only the state file at the path above. It does not access environment variables, network sockets, or other files.
+- **No browser required.** Data is fetched via HTTP requests and parsed from HTML. No JavaScript execution.
+- **`parse-stock.py` is sandboxed.** It reads/writes only the state file at the path above. It does not access environment variables or other files.
 - **Buy/sell signals are heuristic only.** No financial data or decisions are transmitted anywhere. All analysis runs locally.
